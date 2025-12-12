@@ -1,0 +1,415 @@
+<!doctype html>
+<html lang="cs">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Rozvrh podle tříd — Suplování</title>
+  <style>
+    :root {
+  --primary: #3b82f6;         
+  --primary-dark: #2563eb;
+  --accent: #10b981;       
+  --accent-hover: #059669;
+  --danger: #ef4444;         
+  --danger-light: #fef2f2;
+  --danger-hover: #dc2626;
+  --text-main: #1e293b;       
+  --text-muted: #64748b;
+  --bg-body: #f1f5f9;         
+  --bg-surface: #ffffff;
+  --border: #e2e8f0;
+  
+
+  --header-height: 60px;
+  --col-width-class: 120px;
+}
+
+body { 
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; 
+  background-color: var(--bg-body); 
+  color: var(--text-main); 
+  margin: 0;
+  padding: 20px;
+  line-height: 1.5;
+}
+
+h1 { 
+  font-size: 1.75rem; 
+  font-weight: 800; 
+  color: var(--text-main); 
+  margin-bottom: 20px;
+  letter-spacing: -0.025em;
+}
+
+.table-wrapper {
+  background: var(--bg-surface);
+  border-radius: 12px;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+  overflow: auto; 
+  max-height: calc(100vh - 100px);
+  border: 1px solid var(--border);
+  position: relative;
+}
+
+table { 
+  width: 100%; 
+  border-collapse: separate;
+  border-spacing: 0;
+  min-width: 1000px; 
+}
+
+th { 
+  background: var(--bg-surface);
+  color: var(--text-muted);
+  font-weight: 600;
+  font-size: 0.85rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  padding: 12px;
+  border-bottom: 2px solid var(--border);
+  border-right: 1px solid var(--border);
+  position: sticky;
+  top: 0;
+  z-index: 10; 
+}
+
+th small {
+  display: block;
+  font-weight: 400;
+  color: var(--text-muted);
+  margin-top: 2px;
+}
+
+th.period.alert { 
+  color: var(--danger); 
+  background-color: var(--danger-light);
+  border-bottom-color: var(--danger);
+}
+
+td.class-name { 
+  background-color: #f8fafc;
+  color: var(--primary-dark);
+  font-weight: 700;
+  font-size: 1.1rem;
+  text-align: center;
+  border-right: 2px solid var(--border);
+  border-bottom: 1px solid var(--border);
+  width: var(--col-width-class);
+  min-width: var(--col-width-class);
+  position: sticky;
+  left: 0;
+  z-index: 5; 
+}
+
+
+.cell { 
+  padding: 10px;
+  border-bottom: 1px solid var(--border);
+  border-right: 1px solid var(--border);
+  vertical-align: top;
+  cursor: pointer;
+  transition: background-color 0.15s ease;
+  min-width: 140px;
+  background: var(--bg-surface);
+}
+
+.cell:hover {
+  background-color: #f0f9ff;
+}
+
+.cell.empty {
+  color: #cbd5e1;
+  text-align: center;
+  font-size: 20px;
+  background-color: #fcfcfc;
+}
+
+
+.cell .teacher { 
+  display: block; 
+  font-weight: 700; 
+  color: var(--text-main); 
+  font-size: 0.95rem;
+}
+.cell .subject { 
+  display: block; 
+  font-size: 0.85rem; 
+  color: var(--primary); 
+  font-weight: 600;
+  margin-top: 2px;
+}
+.cell .room { 
+  display: block; 
+  font-size: 0.75rem; 
+  color: var(--text-muted); 
+  margin-top: 4px;
+}
+
+.cell.subbed { 
+  background-color: #fff1f2; /* Very light red */
+  position: relative;
+}
+
+.cell.subbed:hover {
+  background-color: #ffe4e6;
+}
+
+.cell .sub-indicator {
+  display: inline-block;
+  margin-top: 6px;
+  background-color: var(--danger);
+  color: white;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.1);
+}
+
+.floating { 
+  position: fixed; 
+  right: 24px; 
+  bottom: 24px; 
+  width: 380px; 
+  z-index: 1000; 
+  display: none; 
+  animation: slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes slideUp {
+  from { transform: translateY(20px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+
+.panel { 
+  background: var(--bg-surface); 
+  border-radius: 16px; 
+  padding: 20px; 
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04); 
+  border: 1px solid var(--border);
+}
+
+.panel h3 {
+  margin: 0 0 16px 0;
+  font-size: 1.1rem;
+  color: var(--text-main);
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 10px;
+}
+
+
+#panelInfo {
+  background: #f8fafc;
+  padding: 10px;
+  border-radius: 8px;
+  margin-bottom: 16px;
+  font-size: 0.85rem;
+  color: var(--text-main);
+  border: 1px solid var(--border);
+}
+#panelInfo div { margin-bottom: 4px; }
+#panelInfo span { font-weight: 600; color: var(--primary-dark); }
+
+label { 
+  display: block; 
+  margin-top: 12px; 
+  font-size: 0.8rem; 
+  font-weight: 600; 
+  color: var(--text-muted); 
+  margin-bottom: 4px;
+}
+
+select, textarea { 
+  width: 100%; 
+  padding: 10px; 
+  border-radius: 8px; 
+  border: 1px solid #cbd5e1; 
+  font-family: inherit;
+  font-size: 0.9rem; 
+  box-sizing: border-box; 
+  transition: border-color 0.2s;
+  background: #fff;
+}
+
+select:focus, textarea:focus {
+  outline: none;
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+textarea { resize: vertical; min-height: 60px; }
+
+.btns { 
+  display: grid; 
+  grid-template-columns: 1fr 1fr; 
+  gap: 10px; 
+  margin-top: 20px; 
+}
+
+button { 
+  padding: 10px 16px; 
+  border-radius: 8px; 
+  border: 0; 
+  cursor: pointer; 
+  font-weight: 600; 
+  font-size: 0.9rem;
+  transition: all 0.2s;
+}
+
+.save { 
+  background: var(--accent); 
+  color: white; 
+}
+.save:hover { background: var(--accent-hover); }
+
+.close { 
+  background: white; 
+  border: 1px solid var(--border); 
+  color: var(--text-muted); 
+}
+.close:hover { background: #f1f5f9; color: var(--text-main); }
+
+.delete { 
+  grid-column: span 2; 
+  background: #fee2e2; 
+  color: var(--danger); 
+  margin-top: 5px;
+}
+.delete:hover { background: #fecaca; }
+
+.hint { 
+  font-size: 0.75rem; 
+  color: var(--text-muted); 
+  margin-top: 12px; 
+  text-align: center;
+  line-height: 1.4;
+}
+
+
+@media (max-width: 768px) {
+  .floating { 
+    left: 0; 
+    right: 0; 
+    bottom: 0; 
+    width: 100%; 
+  }
+  .panel {
+    border-radius: 16px 16px 0 0;
+    box-shadow: 0 -4px 20px rgba(0,0,0,0.1);
+  }
+  td.class-name {
+    width: 80px;
+    min-width: 80px;
+    font-size: 0.9rem;
+  }
+}
+/* Přidat do <style> v hlavičce */
+  .filters {
+  display: flex;
+  gap: 20px;
+  background: white;
+  padding: 15px;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  margin-bottom: 20px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.filter-group {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.filter-group label {
+  margin: 0;
+  white-space: nowrap;
+}
+.filter-group select {
+  width: 200px;
+  margin: 0;
+  padding: 8px 12px;
+}
+/* Zvýraznění buňky při filtrování */
+.cell.highlight-teacher {
+  box-shadow: inset 0 0 0 3px var(--primary);
+  background-color: #eff6ff !important;
+}
+  </style>
+</head>
+<body>
+  <h1>Rozvrh podle tříd — Suplování</h1>
+  <div class="filters">
+    <div class="filter-group">
+      <label for="daySelect">Den:</label>
+      <select id="daySelect">
+        <option value="">-- Všechny dny --</option>
+        <option value="1">Pondělí</option>
+        <option value="2">Úterý</option>
+        <option value="3">Středa</option>
+        <option value="4">Čtvrtek</option>
+        <option value="5">Pátek</option>
+      </select>
+    </div>
+  
+    <div class="filter-group">
+      <label for="teacherFilter">Filtr učitele:</label>
+      <select id="teacherFilter">
+        <option value="">-- Všichni učitelé --</option>
+        </select>
+    </div>
+  </div>
+
+  
+  <table id="scheduleTable">
+    <thead>
+      <tr>
+        <th>Třída</th>
+        <th class="period" data-period="1">1<br><small>08:00</small></th>
+        <th class="period" data-period="2">2<br><small>08:55</small></th>
+        <th class="period" data-period="3">3<br><small>09:50</small></th>
+        <th class="period" data-period="4">4<br><small>10:45</small></th>
+        <th class="period" data-period="5">5<br><small>11:40</small></th>
+        <th class="period" data-period="6">6<br><small>12:35</small></th>
+        <th class="period" data-period="7">7<br><small>13:30</small></th>
+        <th class="period" data-period="8">8<br><small>14:30</small></th>
+        <th class="period" data-period="9">9<br><small>15:20</small></th>
+      </tr>
+    </thead>
+    <tbody id="scheduleBody">
+      <tr><td colspan="10">Načítám...</td></tr>
+    </tbody>
+  </table>
+
+  <div class="floating" id="floatingControl">
+    <div class="panel">
+      <h3 id="panelTitle">Suplování</h3>
+
+      <div id="panelInfo">
+        <div><strong>Třída / Hodina:</strong> <span id="infoClassHour"></span></div>
+        <div><strong>Učitel (originál):</strong> <span id="infoOrigTeacher"></span></div>
+        <div><strong>Suplující:</strong> <span id="infoSubTeacher"></span></div>
+      </div>
+
+      <label for="reason">Důvod</label>
+      <textarea id="reason" rows="3" placeholder="Poznámka / důvod..."></textarea>
+
+      <label for="subTeacherSelect">Dostupní učitelé</label>
+      <select id="subTeacherSelect"><option>— načíst nejprve hodinu —</option></select>
+
+      <div class="btns">
+        <button class="save" id="saveBtn">Uložit</button>
+        <button class="close" id="closeBtn">Zavřít</button>
+        <button class="delete" id="deleteBtn" style="display:none;">Zrušit suplování</button>
+      </div>
+
+      <div class="hint" id="panelHint">Kliknutím na buňku vidíš originální/aktuální suplující učitele. Sloupec se zvýrazní pouze v záhlaví.</div>
+    </div>
+  </div>
+
+
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="/script.js"></script>
+</body>
+</html>
