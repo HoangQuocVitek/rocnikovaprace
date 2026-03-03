@@ -1,4 +1,3 @@
-// server.js (robust version - handles missing id_grid in 'suplovani')
 const express = require('express');
 const http = require('http');
 const path = require('path');
@@ -18,9 +17,9 @@ app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
-// Configure DB pool (change via env vars if needed)
+
 const pool = mysql.createPool({
-  host: process.env.DB_HOST || '192.168.11.1',
+  host: process.env.DB_HOST || '192.168.11.5',
   user: process.env.DB_USER || 'zadani2025_13',
   password: process.env.DB_PASS || 'T#hQ$z+zARpc+R',
   database: process.env.DB_NAME || 'rocnikovka2025_zadani_13',
@@ -44,17 +43,12 @@ io.on('connection', socket => {
   socket.on('disconnect', () => console.log('Socket disconnected', socket.id));
 });
 
-/**
- * GET /api/rozvrh
- * - safe: doesn't assume suplovani has id_grid column
- * - returns rows with possible suplovani attached as fields:
- *   idsuplovani, suplujici_jmeno, suplujici_prijmeni, poznamka
- */
+
 app.get('/api/rozvrh', async (req, res) => {
   const den = req.query.den ? Number(req.query.den) : null;
 
   try {
-    // 1) fetch schedule rows (rozvrh_grid joined with rozvrh_data)
+  
     let sql = `
       SELECT
         g.id_grid AS idrozvrh,
@@ -78,31 +72,27 @@ app.get('/api/rozvrh', async (req, res) => {
 
     const [rows] = await pool.query(sql, params);
 
-    // If no rows, return empty quickly
     if (!rows || rows.length === 0) return res.json([]);
 
-    // 2) fetch all suplovani rows (we'll attach them programmatically)
+  
     const [suplRows] = await pool.query('SELECT * FROM suplovani');
 
-    // 3) identify best matching column in suplovani to link to rozvrh_grid
-    // Prefer 'id_grid', then 'id_data', otherwise try to infer ('grid' substring, or a numeric column)
     const suplCols = suplRows && suplRows.length ? Object.keys(suplRows[0]) : [];
     const has = name => suplCols.includes(name);
 
-    let matchKey = null; // column name in suplovani to match against g.id_grid
+    let matchKey = null; 
     if (has('id_grid')) matchKey = 'id_grid';
     else if (has('id_data')) matchKey = 'id_data';
     else {
-      // try find any column containing 'grid' or 'rozvrh' (case-insensitive)
+      
       const candidate = suplCols.find(c => /grid|rozvrh|id_rozvrh|idRozvrh/i.test(c));
       if (candidate) matchKey = candidate;
     }
 
-    // If still null, attempt to find a numeric column whose values match any id_grid values
     if (!matchKey && suplCols.length && suplRows.length) {
       const gridIds = new Set(rows.map(r => Number(r.idrozvrh)).filter(n => !Number.isNaN(n)));
       for (const col of suplCols) {
-        // check if at least one supl row has a numeric value that matches a grid id
+      
         const found = suplRows.some(s => {
           const v = s[col];
           if (v === null || v === undefined) return false;
@@ -116,8 +106,8 @@ app.get('/api/rozvrh', async (req, res) => {
       }
     }
 
-    // 4) create a lookup map from matchKey -> supl row (if matchKey determined)
-    const suplMap = new Map(); // key -> supl row (if multiple per key, keep the last)
+    
+    const suplMap = new Map(); 
     if (matchKey) {
       for (const s of suplRows) {
         const keyVal = s[matchKey];
@@ -125,7 +115,7 @@ app.get('/api/rozvrh', async (req, res) => {
         suplMap.set(String(keyVal), s);
       }
     } else {
-      // no reasonable matching column: try to map by idsuplovani==id_grid as last resort
+
       if (has('idsuplovani')) {
         for (const s of suplRows) {
           const keyVal = s['idsuplovani'];
@@ -135,10 +125,10 @@ app.get('/api/rozvrh', async (req, res) => {
       }
     }
 
-    // 5) attach substitution fields to each row where possible
+
     const out = rows.map(r => {
       const copy = { ...r, idsuplovani: null, suplujici_jmeno: null, suplujici_prijmeni: null, poznamka: null };
-      // try match by matchKey if available
+    
       if (matchKey) {
         const s = suplMap.get(String(r.idrozvrh));
         if (s) {
@@ -149,7 +139,7 @@ app.get('/api/rozvrh', async (req, res) => {
           return copy;
         }
       }
-      // fallback: check by idsuplovani == idrozvrh
+ 
       if (suplMap.has(String(r.idrozvrh))) {
         const s = suplMap.get(String(r.idrozvrh));
         copy.idsuplovani = s.idsuplovani ?? null;
@@ -159,7 +149,7 @@ app.get('/api/rozvrh', async (req, res) => {
         return copy;
       }
 
-      // no substitution found for this row
+    
       return copy;
     });
 
@@ -170,10 +160,7 @@ app.get('/api/rozvrh', async (req, res) => {
   }
 });
 
-/**
- * GET /api/available_teachers/:period
- * unchanged behavior: returns teachers from rozvrh_data not busy at day+period
- */
+
 app.get('/api/available_teachers/:period', async (req, res) => {
   const period = parseInt(req.params.period, 10);
   const day = parseInt(req.query.day, 10) || 1;
@@ -198,14 +185,12 @@ app.get('/api/available_teachers/:period', async (req, res) => {
   }
 });
 
-// CREATE/UPDATE suplovani (still uses id_grid by default)
 app.post('/api/suplovani', async (req, res) => {
   const { idrozvrh, suplujici_jmeno, suplujici_prijmeni, poznamka } = req.body || {};
   if (!idrozvrh || !suplujici_jmeno || !suplujici_prijmeni) return res.status(400).json({ error: 'Missing fields' });
 
   try {
-    // try to update/insert assuming 'id_grid' exists in suplovani; if not, insertion will still succeed but won't set id_grid column
-    // We'll first try to detect if 'id_grid' column exists
+
     const [cols] = await pool.query("SHOW COLUMNS FROM suplovani");
     const colNames = (cols || []).map(c => c.Field);
     const hasIdGrid = colNames.includes('id_grid');
@@ -221,7 +206,7 @@ app.post('/api/suplovani', async (req, res) => {
       io.emit('substitution_added');
       return res.json({ message: 'inserted' });
     } else {
-      // no id_grid column: insert without id_grid (best-effort) and attach note about mismatch
+  
       await pool.query('INSERT INTO suplovani (suplujici_jmeno, suplujici_prijmeni, poznamka) VALUES (?, ?, ?)', [suplujici_jmeno, suplujici_prijmeni, `auto-for-grid:${idrozvrh} ${poznamka || ''}`]);
       io.emit('substitution_added');
       return res.json({ message: 'inserted_no_id_grid' });
@@ -232,13 +217,13 @@ app.post('/api/suplovani', async (req, res) => {
   }
 });
 
-// DELETE suplovani by id or id_grid (best-effort)
+
 app.delete('/api/suplovani/:id', async (req, res) => {
   const id = req.params.id;
   if (!id) return res.status(400).json({ error: 'Missing id' });
 
   try {
-    // check columns first
+
     const [cols] = await pool.query("SHOW COLUMNS FROM suplovani");
     const colNames = (cols || []).map(c => c.Field);
     if (colNames.includes('id_grid')) {
@@ -246,7 +231,7 @@ app.delete('/api/suplovani/:id', async (req, res) => {
       io.emit('substitution_removed');
       return res.json({ message: 'deleted', affected: result.affectedRows });
     } else {
-      // no id_grid column -> try delete by idsuplovani
+
       const numeric = Number(id);
       if (!Number.isNaN(numeric)) {
         const [result] = await pool.query('DELETE FROM suplovani WHERE idsuplovani = ?', [numeric]);
